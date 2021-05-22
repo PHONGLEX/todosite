@@ -21,3 +21,6 @@ urlpatterns = [
     path('', include('todo.urls')),
     path('auth/', include('authentication.urls')),
 ]
+
+handler404 = "helper.views.handle_not_found"
+handler500 = "helper.views.handle_server_error"
