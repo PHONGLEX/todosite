@@ -3,6 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
 from .forms import TodoForm
 from .models import Todo
@@ -19,8 +20,9 @@ def get_showing_todos(request, todos):
     return todos
 
 
+@login_required()
 def index(request):
-    todos = Todo.objects.all()
+    todos = Todo.objects.filter(owner=request.user)
 
     completed_count = todos.filter(is_completed=True).count()
     incomplete_count = todos.filter(is_completed=False).count()
@@ -46,7 +48,9 @@ def create_todo(request):
         is_completed = request.POST.get('is_completed', False)
 
         todo = Todo.objects.create(title=title, description=description
-                                   , is_completed=True if is_completed == "on" else False)
+                                   , is_completed=True if is_completed == "on" else False
+                                   ,owner=request.user)
+
         todo.save()
         messages.add_message(request, messages.SUCCESS, "Todo created success")
         return HttpResponseRedirect(reverse('todo:todo-detail', kwargs={'id': todo.pk}))
@@ -54,6 +58,7 @@ def create_todo(request):
     return render(request, 'todo/create-todo.html', context)
 
 
+@login_required
 def todo_detail(request, id):
     todo = get_object_or_404(Todo, pk=id)
     context = {
@@ -69,13 +74,16 @@ def todo_delete(request, id):
     }
 
     if request.method == 'POST':
-        todo.delete()
-        messages.add_message(request, messages.SUCCESS, "Todo deleted")
-        return HttpResponseRedirect(reverse('todo:home'))
+        if todo.owner == request.user:
+            todo.delete()
+            messages.add_message(request, messages.SUCCESS, "Todo deleted")
+            return HttpResponseRedirect(reverse('todo:home'))
+        return render(request, "todo/todo-delete.html", context)
 
     return render(request, "todo/todo-delete.html", context)
 
 
+@login_required
 def todo_edit(request, id):
     todo = get_object_or_404(Todo, pk=id)
     form = TodoForm(instance=todo)
@@ -93,10 +101,12 @@ def todo_edit(request, id):
         todo.title = title
         todo.description = description
         todo.is_completed = True if is_completed == "on" else False
-        todo.save()
 
-        messages.add_message(request, messages.SUCCESS, "Todo updated success")
+        if todo.owner == request.user:
+            todo.save()
 
-        return HttpResponseRedirect(reverse('todo:todo-detail', kwargs={'id': todo.pk}))
+            messages.add_message(request, messages.SUCCESS, "Todo updated success")
+
+            return HttpResponseRedirect(reverse('todo:todo-detail', kwargs={'id': todo.pk}))
 
     return render(request, "todo/todo-edit.html", context)

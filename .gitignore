@@ -159,4 +159,6 @@ Thumbs.db
 core/.env
 .idea
 
+htmlcov/
+
 # End of https://www.toptal.com/developers/gitignore/api/django
